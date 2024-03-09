@@ -64,14 +64,16 @@ def assign_weights(G,floor = 0.00,ceiling = 9.00):
 
 
 # Visual Display of Graph
-def display_graph(G):
+def display_graph(G, save_png = True):
     plt.figure(figsize=(6, 4))
     pos = nx.spring_layout(G)  # positions for all nodes
     labels = nx.get_edge_attributes(G,'weight')
     nx.draw(G,pos,labels={node:node for node in G.nodes()},edge_color='blue',node_color='red')
     nx.draw_networkx_edge_labels(G,pos,edge_labels=labels)
-    plt.savefig('graph.png')
     plt.show() 
+
+    if (save_png):
+        plt.savefig("graph.png")
     
 
 # Export graph
@@ -95,10 +97,8 @@ def export_graph(G):
                 file.write("{} {} {}\n".format(neighbour_tuple[0],neighbour_tuple[1],G.nodes[neighbour_tuple[0]]['port']))
 
 
-
-graph = generate_random_topology(10,15
-                                 )  
-assign_weights(graph)
-export_graph(graph)
-
-display_graph(graph)
+if __name__ == "__main__":  
+    graph = generate_random_topology(10,15)  
+    assign_weights(graph)
+    export_graph(graph)
+    display_graph(graph)
