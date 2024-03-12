@@ -97,6 +97,13 @@ def export_graph(G):
                 file.write("{} {} {}\n".format(neighbour_tuple[0],neighbour_tuple[1],G.nodes[neighbour_tuple[0]]['port']))
 
 
+def routing_table(G,starting_node):
+    pass 
+
+def shortest_path(G,starting_node,target_node):
+    pass
+
+
 if __name__ == "__main__":  
     graph = generate_random_topology(10,15)  
     assign_weights(graph)
