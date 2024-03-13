@@ -70,11 +70,12 @@ def display_graph(G, save_png = True):
     labels = nx.get_edge_attributes(G,'weight')
     nx.draw(G,pos,labels={node:node for node in G.nodes()},edge_color='blue',node_color='red')
     nx.draw_networkx_edge_labels(G,pos,edge_labels=labels)
-    plt.show() 
 
     if (save_png):
+        print("Saved")
         plt.savefig("graph.png")
-    
+    plt.show() 
+
 
 # Export graph
 def export_graph(G):
