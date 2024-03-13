@@ -71,11 +71,11 @@ def display_graph(G, save_png = True):
     nx.draw(G,pos, labels={node:node for node in G.nodes()},edge_color='blue',node_color='red')
     nx.draw_networkx_edge_labels(G,pos,edge_labels=labels)
 
-
     if (save_png):
+        print("Saved")
         plt.savefig("graph.png")
+    plt.show() 
 
-    plt.show()      
 
 # Export graph into config files.
 def export_graph(G):
