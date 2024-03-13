@@ -1,7 +1,7 @@
 import networkx as nx
 import random
 import matplotlib.pyplot as plt
-
+import heapq
 
 def generate_random_topology(num_nodes,connections,max_connections = 3):
     G = nx.Graph()
@@ -68,15 +68,16 @@ def display_graph(G, save_png = True):
     plt.figure(figsize=(6, 4))
     pos = nx.spring_layout(G)  # positions for all nodes
     labels = nx.get_edge_attributes(G,'weight')
-    nx.draw(G,pos,labels={node:node for node in G.nodes()},edge_color='blue',node_color='red')
+    nx.draw(G,pos, labels={node:node for node in G.nodes()},edge_color='blue',node_color='red')
     nx.draw_networkx_edge_labels(G,pos,edge_labels=labels)
-    plt.show() 
+
 
     if (save_png):
         plt.savefig("graph.png")
-    
 
-# Export graph
+    plt.show()      
+
+# Export graph into config files.
 def export_graph(G):
     # dictionary containing nodes & weight to given neighbour. 
     node_neighbours = {}
@@ -98,14 +99,61 @@ def export_graph(G):
 
 
 def routing_table(G,starting_node):
-    pass 
+    
+    # A node dictionary that has shortest current distance to each node (with path)
+    shortest_path = {starting_node:(0,starting_node)}
+    dist_index = 0
+    predecessor_index = 1
 
-def shortest_path(G,starting_node,target_node):
-    pass
+    # Heap queue.
+    queue = []
+    unvisted_nodes = list(G.nodes())
+    curr_node = starting_node
+
+    # Get shortest paths
+    while (unvisted_nodes):
+        for neighbor in G.neighbors(curr_node):
+            # add all neighbors to priority queue based on total distance. Edge weight + previous total distance. 
+            node_dist = (G.get_edge_data(curr_node,neighbor)['weight'])+shortest_path[curr_node][dist_index]
+            predecessor = shortest_path[curr_node][predecessor_index]
+            
+            # if the neighbor has not yet been encountered we add it to the queue.
+            if neighbor not in shortest_path:
+                heapq.heappush(queue,(node_dist,neighbor))
+
+            # if the neighbor is in the known distance dict, we check whether it is a better path. If it is, we replace it. 
+            if neighbor in shortest_path:
+                if shortest_path[neighbor][dist_index] > node_dist:
+                    shortest_path[neighbor] = (node_dist,predecessor+neighbor)
+
+            # If the node is not the known distance dict, we simply add it. 
+            else:
+                shortest_path[neighbor] = (node_dist,predecessor+neighbor)
+
+        # Node has now been visited.          
+        unvisted_nodes.remove(curr_node)
+
+        # If queue is not empty we get next item.     
+        if queue:
+            curr_node = heapq.heappop(queue)[1]
+
+    # Remove inital starting point for ease of printing
+    del shortest_path[starting_node]
+    # Format routing table. 
+    print(f"I am node {starting_node}")
+    for node in sorted(list(shortest_path.keys())):
+        print(f"Least cost path from {starting_node} to {node}: {shortest_path[node][1]}, link cost: {round(float(shortest_path[node][0]),1)}")
+
+
+
+
+
 
 
 if __name__ == "__main__":  
-    graph = generate_random_topology(10,15)  
+    graph = generate_random_topology(5,8)  
     assign_weights(graph)
     export_graph(graph)
+    routing_table(graph,'A')
+
     display_graph(graph)
