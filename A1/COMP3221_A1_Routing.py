@@ -2,6 +2,23 @@
 import sys
 import networkx as nx
 import nodegen
+import threading
+import socket
+import time
+
+def listening_thread(conn, addr):
+    print("listening starting")
+
+    # recv message
+    message = conn.recv(1024)
+    message = message.decode()
+    print("listening from port:", addr, 'recv:', message)
+    return
+
+def sending_thread(conn, addr):  
+    # send answer
+    return
+
 
 if __name__ == "__main__":
     #python COMP3221_A1_Routing.py F 6005 Fconfig.txt
@@ -26,11 +43,68 @@ if __name__ == "__main__":
 
     except:
         raise Exception("Invalid config file")
-    
+
 
     nodegen.display_graph(G,False)
+    host = '0.0.0.0'
+    port = 6000
+    s = socket.socket()
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # solution for "[Error 89] Address already in use". Use before bind()
+    s.bind((host, port))
+    s.listen(1)
 
-    # Listening Thread
-    # Sending thread
-    # Routing Calculation thread
+    try:
+        while True:
+            print("Waiting for client")
+            conn, addr = s.accept()
     
+            print("Client:", addr)
+
+            # Listening Thread
+            listen = threading.Thread(target=listening_thread, args=(conn, addr))
+            listen.start()
+
+            # Sending thread
+            send = threading.Thread(target=listening_thread, args=(conn, addr))
+            send.start()
+                    
+            # Routing Calculation thread
+
+    except KeyboardInterrupt:
+        print("Stopped by Ctrl+C")
+    
+    conn.close()
+
+"""     while True:
+        for neighbour in G.nodes.items():
+            try:
+                while True:
+                    print("Waiting for client")
+                    conn, addr = s.accept()
+    
+                    print("Client:", addr)
+
+                    # Listening Thread
+                    listen = threading.Thread(target=listening_thread, args=(conn, addr))
+                    listen.start()
+
+                    # Sending thread
+                    send = threading.Thread(target=listening_thread, args=(conn, addr))
+                    send.start()
+
+                    # Routing Calculation thread
+
+            except KeyboardInterrupt:
+                print("Stopped by Ctrl+C")
+    
+            conn.close() """
+
+
+
+
+
+
+    
+
+
+
