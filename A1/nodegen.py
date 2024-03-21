@@ -8,7 +8,7 @@ def generate_random_topology(num_nodes,connections,max_connections = 3):
 
     # Generate named nodes
     nodes = []
-    for i in range(0,num_nodes+1):
+    for i in range(0,num_nodes):
         nodes.append(chr(ord('A')+i))
         G.add_node(nodes[i],port =6000+i)
 
@@ -31,7 +31,7 @@ def generate_random_topology(num_nodes,connections,max_connections = 3):
 
 
     # refresh node list so we can repeat process.
-    nodes = list(G.nodes)
+    nodes = list(G.nodes())
 
     # recurisevly add edges until we meet the edge requirement. Note that we have a maximum number of connections as denoted by the first variable in the funciton: max_connections.
     while (len(list(G.edges)) < connections):
@@ -52,7 +52,7 @@ def generate_random_topology(num_nodes,connections,max_connections = 3):
     return G
 
 # Add randomly assigned weights.
-def assign_weights(G,floor = 0.00,ceiling = 9.00):
+def assign_weights(G,floor = 0.1,ceiling = 9.00):
     weight = {}
     
     for key in list(G.edges()):
@@ -64,21 +64,28 @@ def assign_weights(G,floor = 0.00,ceiling = 9.00):
 
 
 # Visual Display of Graph
-def display_graph(G, save_png = True):
+def display_graph(G):
     plt.figure(figsize=(6, 4))
     pos = nx.spring_layout(G)  # positions for all nodes
     labels = nx.get_edge_attributes(G,'weight')
     nx.draw(G,pos, labels={node:node for node in G.nodes()},edge_color='blue',node_color='red')
     nx.draw_networkx_edge_labels(G,pos,edge_labels=labels)
-
-    if (save_png):
-        print("Saved")
-        plt.savefig("graph.png")
     plt.show() 
 
 
+# Visual Display of Graph
+def save_graph_png(G):
+    plt.figure(figsize=(6, 4))
+    pos = nx.spring_layout(G)  # positions for all nodes
+    labels = nx.get_edge_attributes(G,'weight')
+    nx.draw(G,pos, labels={node:node for node in G.nodes()},edge_color='blue',node_color='red')
+    nx.draw_networkx_edge_labels(G,pos,edge_labels=labels)
+    plt.savefig("graph.png")
+
+
+
 # Export graph into config files.
-def export_graph(G):
+def export_graph_as_config(G):
     # dictionary containing nodes & weight to given neighbour. 
     node_neighbours = {}
     for edge in G.edges():
@@ -98,6 +105,8 @@ def export_graph(G):
                 file.write("{} {} {}\n".format(neighbour_tuple[0],neighbour_tuple[1],G.nodes[neighbour_tuple[0]]['port']))
 
 
+
+# Function that takes in a graph and a starting node and outputs shortest path to all other nodes.
 def routing_table(G,starting_node):
     
     # A node dictionary that has shortest current distance to each node (with path)
@@ -130,19 +139,23 @@ def routing_table(G,starting_node):
             else:
                 shortest_path[neighbor] = (node_dist,predecessor+neighbor)
 
-        # Node has now been visited.          
+
         unvisted_nodes.remove(curr_node)
 
         # If queue is not empty we get next item.     
         if queue:
             curr_node = heapq.heappop(queue)[1]
 
-    # Remove inital starting point for ease of printing
+
+
+    # Remove inital starting point for ease of printing (i.e., remove path A to A as its redundant)
     del shortest_path[starting_node]
+
+
     # Format routing table. 
     print(f"I am node {starting_node}")
     for node in sorted(list(shortest_path.keys())):
-        print(f"Least cost path from {starting_node} to {node}: {shortest_path[node][1]}, link cost: {round(float(shortest_path[node][0]),1)}")
+        print(f"Least cost path from {starting_node} to {node}: {shortest_path[node][predecessor_index]}, link cost: {round(float(shortest_path[node][dist_index]),1)}")
 
 
 
@@ -151,9 +164,9 @@ def routing_table(G,starting_node):
 
 
 if __name__ == "__main__":  
-    graph = generate_random_topology(5,8)  
+    graph = generate_random_topology(3,3)  
     assign_weights(graph)
-    export_graph(graph)
-    routing_table(graph,'A')
-
+    export_graph_as_config(graph)
+    save_graph_png(graph)
     display_graph(graph)
+    routing_table(graph,'A')
