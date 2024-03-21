@@ -6,29 +6,43 @@ import threading
 import socket
 import select
 import time
+from NodeObj import NodeObj
+
+def rerouter(node_obj):
+    time.sleep(60)
+    while True:
+        if (node_obj.reroute_flag):
+            print("Testing?")
+            node_obj.reroute_flag = False
+            nodegen.routing_table(node_obj.G,node_obj.node)
+
+
+
 
 # Create a server and listen for incoming connections from neighbouring ports.
-def create_server_and_listen(host_port,neighbour_ports,Graph):
-
+def create_server_and_listen(node_obj):
+    
+    host_port = node_obj.server_port
+    
+    
     print("Server hosted on port {}".format(host_port))
-    num_connections = len(neighbour_ports)
-    host = '127.0.0.1'
+    expected_connections = len(node_obj.neighbour_ports)
+    host = node_obj.host
     s = socket.socket()
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # solution for "[Error 89] Address already in use". Use before bind()
     s.bind((host, host_port))
-    s.listen(num_connections) # Number of connections is the number of neighbours in the graph.
+    s.listen(expected_connections) # Number of connections is the number of neighbours in the graph.
 
-    sockets = []
+    sockets = node_obj.server_sockets
 
     # Connect to all clients that are trying to connect. Number of connections expected is the number of neighbours.
     try:
-        while len(sockets) != num_connections:
+        while len(sockets) != expected_connections:
             print("Waiting for client")
             conn, addr = s.accept()
             sockets.append(conn)
 
             print("Client:", addr)
-            print(f"Connections: {sockets}")
             
     except KeyboardInterrupt:
         print("Stopped by Ctrl+C")
@@ -47,23 +61,25 @@ def create_server_and_listen(host_port,neighbour_ports,Graph):
 
                     # Decode messages recieved.
                     else: 
-                        print(f"Received message:", data.decode("utf-8"))
+                        message = node_obj.decode_topology(data)
+                        print(f"Received message:",message)
+
 
 
 
 # Establish connections with neighbours. 
-def establish_connections(ports,Graph):
-    sockets = []
-    host = "127.0.0.1"
+def establish_connections(node_obj):
 
-    for port in ports:
+    host = node_obj.host
+
+    for port in node_obj.neighbour_ports:
 
         connected = False
         while not connected:    
             try:
                 s = socket.socket(socket.AF_INET,socket.SOCK_STREAM,)
                 s.connect((host,port))
-                sockets.append(s)
+                node_obj.client_sockets.append(s)
                 connected = True
                 print(f"Connection established to {port}")
 
@@ -71,9 +87,14 @@ def establish_connections(ports,Graph):
                 print(f"Failed connecting to {port}: {e}")
                 time.sleep(3)
 
-    for sock in sockets:
-        sock.send(str(f"sending_msg_to_{sock.getsockname()[1]}").encode("utf-8"))
-
+    while True:
+        # Get all new links. Designed in a way such that we never miss information.
+        for sock in node_obj.client_sockets:
+            try:
+                sock.send(node_obj.encode_topology())
+            except ConnectionResetError:
+                pass
+        time.sleep(10)
 
 
 
@@ -92,33 +113,20 @@ if __name__ == "__main__":
     port_number = int(sys.argv[2])
     config = sys.argv[3]
 
-    # Initiate Node graph.
-    G = nx.Graph()
-    G.add_node(node,port = port_number)
-
-    try:
-        with open(config,"r") as file:
-            lines = int(file.readline())
-            for i in range(0,lines):
-                line = file.readline().strip().split()
-                G.add_node(line[0],port = int(line[2]))
-                G.add_edge(node,line[0],weight =round(float(line[1]),1))
-
-    except:
-        raise Exception("Invalid config file")
-
-
-    neighbour_ports = [int(G.nodes()[node]['port']) for node in G.neighbors(node)]
+    node_obj = NodeObj(node,port_number,config)
 
 
     # Listening Thread / Server thread
-    listen_thread = threading.Thread(target=create_server_and_listen,args=(port_number,neighbour_ports,G))
+    listen_thread = threading.Thread(target=create_server_and_listen,args=(node_obj,))
     listen_thread.start()
 
     # Sending thread
-    sending_thread = threading.Thread(target = establish_connections,args = (neighbour_ports,G))
+    sending_thread = threading.Thread(target = establish_connections,args = (node_obj,))
     sending_thread.start()
+
     # Routing Calculation thread
+    route_thread = threading.Thread(target = rerouter,args = (node_obj,))
+    route_thread.start()
 
 
 

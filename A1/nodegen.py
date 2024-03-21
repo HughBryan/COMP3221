@@ -71,16 +71,18 @@ def display_graph(G):
     nx.draw(G,pos, labels={node:node for node in G.nodes()},edge_color='blue',node_color='red')
     nx.draw_networkx_edge_labels(G,pos,edge_labels=labels)
     plt.show() 
+    
+
 
 
 # Visual Display of Graph
-def save_graph_png(G):
+def save_graph_png(G,name = "graph.png"):
     plt.figure(figsize=(6, 4))
     pos = nx.spring_layout(G)  # positions for all nodes
     labels = nx.get_edge_attributes(G,'weight')
     nx.draw(G,pos, labels={node:node for node in G.nodes()},edge_color='blue',node_color='red')
     nx.draw_networkx_edge_labels(G,pos,edge_labels=labels)
-    plt.savefig("graph.png")
+    plt.savefig(name)
 
 
 
@@ -164,9 +166,14 @@ def routing_table(G,starting_node):
 
 
 if __name__ == "__main__":  
-    graph = generate_random_topology(3,3)  
+    graph = generate_random_topology(3,2)  
     assign_weights(graph)
     export_graph_as_config(graph)
+
+
+    
+    
+    display_graph(graph)    
     save_graph_png(graph)
-    display_graph(graph)
-    routing_table(graph,'A')
+    #routing_table(graph,'A')
+
