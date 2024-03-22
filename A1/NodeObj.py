@@ -35,7 +35,7 @@ class NodeObj:
 
         # List that will function as a queue of updated weights that will be sent via packets. 
         self.sending_queue = [(node,neighbour,G.get_edge_data(node,neighbour)['weight']) for neighbour in list(G.neighbors(node))]
-
+        print(self.sending_queue)
         
     def encode_topology(self) -> str:
         G = self.G
