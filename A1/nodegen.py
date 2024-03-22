@@ -3,7 +3,7 @@ import random
 import matplotlib.pyplot as plt
 import heapq
 
-def generate_random_topology(num_nodes,connections,max_connections = 3):
+def generate_random_topology(num_nodes,connections,max_connections = 3) -> nx.Graph:
     G = nx.Graph()
 
     # Generate named nodes

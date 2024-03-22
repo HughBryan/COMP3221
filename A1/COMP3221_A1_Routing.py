@@ -8,26 +8,53 @@ import select
 import time
 from NodeObj import NodeObj
 
-def rerouter(node_obj):
-    time.sleep(60)
+# Function to accept commands.
+def command_line_interface(node_obj,t1,t2,t3):
     while True:
-        if (node_obj.reroute_flag):
-            print("Testing?")
+        try:
+            user_in = input("Enter Command: ")
+            if user_in == "DOWN":
+                # node offonline  
+                pass
+
+
+            if user_in == "UP":
+                pass
+
+            if user_in.startswith("CHANGE"):
+                user_in.split(" ")
+
+
+        except KeyboardInterrupt:
+            print("Interrupted by user. Shuttdowning down threads.")
+            t1.stop()
+            t2.stop()
+            t3.stop()
+            
+            for socket in node_obj.server_sockets:
+                socket.close()
+            for socket in node_obj.client_sockets:
+                socket.close()
+
+
+# Rerouter. 
+def rerouter(node_obj):
+    while True:
+        if (node_obj.reroute_flag and node_obj.node_online):
             node_obj.reroute_flag = False
             nodegen.routing_table(node_obj.G,node_obj.node)
-
+            time.sleep(10)
 
 
 
 # Create a server and listen for incoming connections from neighbouring ports.
 def create_server_and_listen(node_obj):
-    
+
     host_port = node_obj.server_port
-    
-    
-    print("Server hosted on port {}".format(host_port))
-    expected_connections = len(node_obj.neighbour_ports)
     host = node_obj.host
+    expected_connections = len(node_obj.neighbour_ports)
+
+    # Create socket object to act as server. 
     s = socket.socket()
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # solution for "[Error 89] Address already in use". Use before bind()
     s.bind((host, host_port))
@@ -35,25 +62,29 @@ def create_server_and_listen(node_obj):
 
     sockets = node_obj.server_sockets
 
+    print("Server hosted on port {}".format(host_port))
+
     # Connect to all clients that are trying to connect. Number of connections expected is the number of neighbours.
     try:
         while len(sockets) != expected_connections:
             print("Waiting for client")
             conn, addr = s.accept()
             sockets.append(conn)
+            print(f"Server connected to: {s.getsockname()[1]}",)
 
-            print("Client:", addr)
-            
     except KeyboardInterrupt:
         print("Stopped by Ctrl+C")
     
     # Listen to messages forever. 
     while True:
         # Select returns ready sockets that have informaiton in them.
-        if sockets:
-            ready_socks,_,_ = select.select(sockets, [], []) 
+        if node_obj.server_sockets and node_obj.node_online:
+            ready_socks,_,_ = select.select(node_obj.server_sockets, [], []) 
 
             for sock in ready_socks:
+                    if sock in node_obj.offline_client_sockets:
+                        node_obj.add_connection(sock)
+
                     data = sock.recv(3000) 
                     if not data:
                         sock.close()
@@ -63,6 +94,7 @@ def create_server_and_listen(node_obj):
                     else: 
                         message = node_obj.decode_topology(data)
                         print(f"Received message:",message)
+                        sock.send(b"Recieved")
 
 
 
@@ -81,20 +113,40 @@ def establish_connections(node_obj):
                 s.connect((host,port))
                 node_obj.client_sockets.append(s)
                 connected = True
-                print(f"Connection established to {port}")
+                print(f"Client connected to {port}")
 
             except Exception as e:
                 print(f"Failed connecting to {port}: {e}")
-                time.sleep(3)
+                time.sleep(5)
 
     while True:
         # Get all new links. Designed in a way such that we never miss information.
-        for sock in node_obj.client_sockets:
-            try:
-                sock.send(node_obj.encode_topology())
-            except ConnectionResetError:
-                pass
-        time.sleep(10)
+        if node_obj.node_online:
+            for sock in node_obj.client_sockets:
+                try:
+                    # send topology
+                    sock.send(node_obj.encode_topology())
+
+
+                    # Wait 3 seconds for return. If it does not return, we can assume that node is down. 
+                    ready_sock,_,_ = select.select([sock], [], [],10) 
+                    if not ready_sock:
+                        print("Sock didn't work")
+                        #node_obj.remove_connection(sock)
+                    else:
+                        message = sock.recv(3000).decode("utf8")
+                        if message == "Recieved":
+                            print(f"Socket recieved")
+                        else:
+                            print(f"Unknown message recieved: {message}")
+
+
+
+
+
+                except ConnectionResetError:
+                    pass
+            time.sleep(10)
 
 
 
@@ -128,7 +180,3 @@ if __name__ == "__main__":
     route_thread = threading.Thread(target = rerouter,args = (node_obj,))
     route_thread.start()
 
-
-
-
-    
