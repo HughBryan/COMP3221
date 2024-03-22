@@ -13,17 +13,18 @@ def command_line_interface(node_obj,t1,t2,t3):
     while True:
         try:
             user_in = input("Enter Command: ")
-            if user_in == "DOWN":
+            if user_in.upper() == "DOWN":
                 # node offonline  
-                pass
+                node_obj.disable_node()
 
 
-            if user_in == "UP":
-                pass
+            if user_in.upper() == "UP":
+                node_obj.enable_node()
 
-            if user_in.startswith("CHANGE"):
-                user_in.split(" ")
-
+            if user_in.upper().startswith("CHANGE"):
+                try:
+                    node_obj.update_connection(user_in)
+                except: print("Invalid input. I.e., CHANGE A B 24")
 
         except KeyboardInterrupt:
             print("Interrupted by user. Shuttdowning down threads.")
@@ -80,7 +81,7 @@ def create_server_and_listen(node_obj):
         # Select returns ready sockets that have informaiton in them.
         if node_obj.server_sockets and node_obj.node_online:
             ready_socks,_,_ = select.select(node_obj.server_sockets, [], []) 
-
+        
             for sock in ready_socks:
                     if sock in node_obj.offline_client_sockets:
                         node_obj.add_connection(sock)
@@ -95,6 +96,7 @@ def create_server_and_listen(node_obj):
                         message = node_obj.decode_topology(data)
                         print(f"Received message:",message)
                         sock.send(b"Recieved")
+            
 
 
 
@@ -122,28 +124,26 @@ def establish_connections(node_obj):
     while True:
         # Get all new links. Designed in a way such that we never miss information.
         if node_obj.node_online:
+            queue = node_obj.sending_queue
+            node_obj.sending_queue = []
+            
             for sock in node_obj.client_sockets:
                 try:
                     # send topology
-                    sock.send(node_obj.encode_topology())
+                    sock.send(node_obj.encode_queue(queue))
 
 
                     # Wait 3 seconds for return. If it does not return, we can assume that node is down. 
-                    ready_sock,_,_ = select.select([sock], [], [],10) 
+                    timeout = 3
+                    ready_sock,_,_ = select.select([sock], [], [],timeout) 
                     if not ready_sock:
-                        print("Sock didn't work")
-                        #node_obj.remove_connection(sock)
+                        node_obj.remove_connection(sock)
                     else:
                         message = sock.recv(3000).decode("utf8")
                         if message == "Recieved":
                             print(f"Socket recieved")
                         else:
                             print(f"Unknown message recieved: {message}")
-
-
-
-
-
                 except ConnectionResetError:
                     pass
             time.sleep(10)
@@ -180,3 +180,4 @@ if __name__ == "__main__":
     route_thread = threading.Thread(target = rerouter,args = (node_obj,))
     route_thread.start()
 
+    command_line_interface(node_obj,listen_thread,sending_thread,route_thread)

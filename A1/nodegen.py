@@ -2,6 +2,7 @@ import networkx as nx
 import random
 import matplotlib.pyplot as plt
 import heapq
+import math
 
 def generate_random_topology(num_nodes,connections,max_connections = 3) -> nx.Graph:
     G = nx.Graph()
@@ -17,7 +18,7 @@ def generate_random_topology(num_nodes,connections,max_connections = 3) -> nx.Gr
 
 
     # Recursisvely add unnconnected nodes to the graph randomly.
-    while (len(nodes)>0):
+    while (len(nodes)>0 and len(G.edges()) < connections):
         node1 = random.choice(nodes)
         nodes.remove(node1)
 
@@ -110,7 +111,9 @@ def export_graph_as_config(G):
 
 # Function that takes in a graph and a starting node and outputs shortest path to all other nodes.
 def routing_table(G,starting_node):
-    
+
+
+
     # A node dictionary that has shortest current distance to each node (with path)
     shortest_path = {starting_node:(0,starting_node)}
     dist_index = 0
@@ -118,11 +121,11 @@ def routing_table(G,starting_node):
 
     # Heap queue.
     queue = []
-    unvisted_nodes = list(G.nodes())
+    unvisited_nodes = list(set(x for x in list(G.nodes()) if G.degree()[x]>0))
     curr_node = starting_node
 
     # Get shortest paths
-    while (unvisted_nodes):
+    while (unvisited_nodes):
         for neighbor in G.neighbors(curr_node):
             # add all neighbors to priority queue based on total distance. Edge weight + previous total distance. 
             node_dist = (G.get_edge_data(curr_node,neighbor)['weight'])+shortest_path[curr_node][dist_index]
@@ -142,7 +145,7 @@ def routing_table(G,starting_node):
                 shortest_path[neighbor] = (node_dist,predecessor+neighbor)
 
 
-        unvisted_nodes.remove(curr_node)
+        unvisited_nodes.remove(curr_node)
 
         # If queue is not empty we get next item.     
         if queue:
@@ -161,19 +164,17 @@ def routing_table(G,starting_node):
 
 
 
-
+    
 
 
 
 if __name__ == "__main__":  
-    graph = generate_random_topology(3,2)  
+    graph = generate_random_topology(3,1)  
     assign_weights(graph)
     export_graph_as_config(graph)
 
-
-    
     
     display_graph(graph)    
     save_graph_png(graph)
-    #routing_table(graph,'A')
+    routing_table(graph,'A')
 
