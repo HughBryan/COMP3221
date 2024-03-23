@@ -164,12 +164,12 @@ def routing_table(G,starting_node):
 
 
 
-    
+
 
 
 
 if __name__ == "__main__":  
-    graph = generate_random_topology(3,1)  
+    graph = generate_random_topology(3,2)  
     assign_weights(graph)
     export_graph_as_config(graph)
 

@@ -16,6 +16,8 @@ class NodeObj:
         self.client_sockets = []
         self.offline_client_sockets = []
 
+        
+
         G = nx.Graph()
         G.add_node(node,port = server_port)
         try:
@@ -61,9 +63,11 @@ class NodeObj:
         
         for edge in packets_received:
 
+
             # If we recieve a packet with only a single node, it means its marked for being down. 
             if len(edge) == 1:
-                if self.G.has_node(edge[0]):
+                # If the graph has the node and is not the node marked for removal; remove it. 
+                if self.G.has_node(edge[0]) and self.node != edge[0]:
                     self.G.remove_node(edge[0])
                     pass_on_packets.append(edge)
                     self.reroute_flag = True
@@ -124,6 +128,8 @@ class NodeObj:
             self.offline_client_sockets.remove(socket)
         except Exception as e:
             print(f"Error reconnecting with socket: {e}")
+        
+        # Send topology of 
     
     def update_connection(self,user_in):
         user_in = user_in.split(" ")
@@ -138,8 +144,10 @@ class NodeObj:
             print("One of the selected nodes doesn't exist.")
             return
         
-        if 
-        self.G['A']['B']['weight'] = 10
+        if ((node1,node2) in self.G.edges() or (node2,node1) in self.G.edges()):
+            self.G[node1][node2]['weight'] = weight
+        else:
+            print(f"Connection does not exist to update: {node1} {node2}")
 
 
         self.sending_queue.append([node1,node2,weight])

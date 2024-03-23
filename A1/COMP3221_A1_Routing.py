@@ -28,10 +28,9 @@ def command_line_interface(node_obj,t1,t2,t3):
 
         except KeyboardInterrupt:
             print("Interrupted by user. Shuttdowning down threads.")
-            t1.stop()
-            t2.stop()
-            t3.stop()
-            
+            t1.set()
+            t2.set()
+            t3.set()
             for socket in node_obj.server_sockets:
                 socket.close()
             for socket in node_obj.client_sockets:
@@ -86,7 +85,7 @@ def create_server_and_listen(node_obj):
                     if sock in node_obj.offline_client_sockets:
                         node_obj.add_connection(sock)
 
-                    data = sock.recv(3000) 
+                    data = sock.recv(4096) 
                     if not data:
                         sock.close()
                         sockets.remove(sock)
@@ -139,7 +138,7 @@ def establish_connections(node_obj):
                     if not ready_sock:
                         node_obj.remove_connection(sock)
                     else:
-                        message = sock.recv(3000).decode("utf8")
+                        message = sock.recv(4096).decode("utf8")
                         if message == "Recieved":
                             print(f"Socket recieved")
                         else:
