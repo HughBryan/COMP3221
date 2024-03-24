@@ -2,7 +2,6 @@ import networkx as nx
 import random
 import matplotlib.pyplot as plt
 import heapq
-import math
 
 def generate_random_topology(num_nodes,connections,max_connections = 3) -> nx.Graph:
     G = nx.Graph()
@@ -29,6 +28,7 @@ def generate_random_topology(num_nodes,connections,max_connections = 3) -> nx.Gr
 
         connected_nodes.append(node1)
         G.add_edge(node1,node2)
+    
 
 
     # refresh node list so we can repeat process.
@@ -49,6 +49,7 @@ def generate_random_topology(num_nodes,connections,max_connections = 3) -> nx.Gr
             pass
 
         G.add_edge(node1,node2)
+    
 
     return G
 
@@ -169,11 +170,10 @@ def routing_table(G,starting_node):
 
 
 if __name__ == "__main__":  
-    graph = generate_random_topology(3,2)  
+    graph = generate_random_topology(10,15)  
     assign_weights(graph)
     export_graph_as_config(graph)
 
-    
     display_graph(graph)    
     save_graph_png(graph)
     routing_table(graph,'A')

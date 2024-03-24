@@ -8,29 +8,30 @@ import select
 import time
 from NodeObj import NodeObj
 
+
 # Function to accept commands.
-def command_line_interface(node_obj,t1,t2,t3):
+def command_line_interface(node_obj):
     while True:
         try:
             user_in = input("Enter Command: ")
-            if user_in.upper() == "DOWN":
-                # node offonline  
+            if user_in.upper() == "DOWN" and node_obj.node_online:
                 node_obj.disable_node()
 
 
-            if user_in.upper() == "UP":
-                node_obj.enable_node()
+            elif user_in.upper() == "UP" and node_obj.node_online:
+                    node_obj.enable_node()
 
-            if user_in.upper().startswith("CHANGE"):
+            elif user_in.upper().startswith("CHANGE"):
                 try:
                     node_obj.update_connection(user_in)
                 except: print("Invalid input. I.e., CHANGE A B 24")
+            
+            else:
+                print("Invalid command.")
 
         except KeyboardInterrupt:
-            print("Interrupted by user. Shuttdowning down threads.")
-            t1.set()
-            t2.set()
-            t3.set()
+            print("Interrupted by user. Shuttdowning down sockets.")
+
             for socket in node_obj.server_sockets:
                 socket.close()
             for socket in node_obj.client_sockets:
@@ -39,16 +40,20 @@ def command_line_interface(node_obj,t1,t2,t3):
 
 # Rerouter. 
 def rerouter(node_obj):
+    inital_sleep = 60
+    time.sleep(inital_sleep)
+    default_timeout = 10
     while True:
         if (node_obj.reroute_flag and node_obj.node_online):
             node_obj.reroute_flag = False
             nodegen.routing_table(node_obj.G,node_obj.node)
-            time.sleep(10)
+            time.sleep(default_timeout)
 
 
 
 # Create a server and listen for incoming connections from neighbouring ports.
 def create_server_and_listen(node_obj):
+    buffer = 4096
 
     host_port = node_obj.server_port
     host = node_obj.host
@@ -62,30 +67,28 @@ def create_server_and_listen(node_obj):
 
     sockets = node_obj.server_sockets
 
-    print("Server hosted on port {}".format(host_port))
 
     # Connect to all clients that are trying to connect. Number of connections expected is the number of neighbours.
     try:
         while len(sockets) != expected_connections:
-            print("Waiting for client")
             conn, addr = s.accept()
             sockets.append(conn)
-            print(f"Server connected to: {s.getsockname()[1]}",)
 
     except KeyboardInterrupt:
         print("Stopped by Ctrl+C")
     
+    # We are now ready to send data packets. 
+    node_obj.ready_to_send = True
     # Listen to messages forever. 
     while True:
-        # Select returns ready sockets that have informaiton in them.
+        # Select returns ready sockets that have information in them.
         if node_obj.server_sockets and node_obj.node_online:
             ready_socks,_,_ = select.select(node_obj.server_sockets, [], []) 
-        
-            for sock in ready_socks:
-                    if sock in node_obj.offline_client_sockets:
-                        node_obj.add_connection(sock)
 
-                    data = sock.recv(4096) 
+
+            for sock in ready_socks:
+                    # check if it is an offline node. If it is, we turn it online. 
+                    data = sock.recv(buffer) 
                     if not data:
                         sock.close()
                         sockets.remove(sock)
@@ -93,7 +96,6 @@ def create_server_and_listen(node_obj):
                     # Decode messages recieved.
                     else: 
                         message = node_obj.decode_topology(data)
-                        print(f"Received message:",message)
                         sock.send(b"Recieved")
             
 
@@ -102,7 +104,9 @@ def create_server_and_listen(node_obj):
 
 # Establish connections with neighbours. 
 def establish_connections(node_obj):
-
+    default_timeout = 60
+    inital_port = 6000
+    buffer = 4096
     host = node_obj.host
 
     for port in node_obj.neighbour_ports:
@@ -113,14 +117,15 @@ def establish_connections(node_obj):
                 s = socket.socket(socket.AF_INET,socket.SOCK_STREAM,)
                 s.connect((host,port))
                 node_obj.client_sockets.append(s)
+                # The target port will correspond with the socket that attaches to it. 
+                node_obj.matching_ports[chr(port-inital_port+ord('A'))] = s
                 connected = True
-                print(f"Client connected to {port}")
 
             except Exception as e:
-                print(f"Failed connecting to {port}: {e}")
+                print(f"Failed connecting to {port}")
                 time.sleep(5)
 
-    while True:
+    while node_obj.ready_to_send:
         # Get all new links. Designed in a way such that we never miss information.
         if node_obj.node_online:
             queue = node_obj.sending_queue
@@ -132,20 +137,21 @@ def establish_connections(node_obj):
                     sock.send(node_obj.encode_queue(queue))
 
 
-                    # Wait 3 seconds for return. If it does not return, we can assume that node is down. 
-                    timeout = 3
+                    # Wait 2 seconds for return. If it does not return, we can assume that node is down. 
+                    timeout = 2
                     ready_sock,_,_ = select.select([sock], [], [],timeout) 
+                    
+                    # If we didn't receieve a response, we can only assume that the node is offline. 
                     if not ready_sock:
                         node_obj.remove_connection(sock)
                     else:
-                        message = sock.recv(4096).decode("utf8")
-                        if message == "Recieved":
-                            print(f"Socket recieved")
-                        else:
-                            print(f"Unknown message recieved: {message}")
+                        message = sock.recv(buffer).decode("utf8")
+
                 except ConnectionResetError:
                     pass
-            time.sleep(10)
+            
+            
+            time.sleep(default_timeout)
 
 
 
@@ -155,6 +161,8 @@ def establish_connections(node_obj):
 #python COMP3221_A1_Routing.py F 6005 Fconfig.txt
 
 if __name__ == "__main__":
+    print("Welcome. Commannds are 'DOWN', 'UP', 'CHANGE *NODE1 *NODE2 *WEIGHT'")
+    print("Changes to weights must be done for existing connections of this given node.")
     # Startup. Get commandline arguments etc.
 
     if (len(sys.argv) < 4):
@@ -179,4 +187,4 @@ if __name__ == "__main__":
     route_thread = threading.Thread(target = rerouter,args = (node_obj,))
     route_thread.start()
 
-    command_line_interface(node_obj,listen_thread,sending_thread,route_thread)
+    command_line_interface(node_obj)
