@@ -9,6 +9,7 @@ class NodeObj:
         self.node = node
         self.host = "127.0.0.1"	
         self.server_port = server_port
+        self.ready_to_send = False
         
         self.reroute_flag = True 
         self.node_online = True
@@ -88,7 +89,6 @@ class NodeObj:
 
             else:
     
-                print(edge)
 
                 edge_weight  = round(float(edge[2]),1)
                 # If the edge already exists and we need to update weight.
@@ -132,13 +132,14 @@ class NodeObj:
         
     def enable_node(self):
         self.node_online = True
+        self.reroute_flag = True
+
         
         # Add nodes ready for sending. 
         for neighbour in self.G.neighbors(self.node):
             self.sending_queue.append([self.node,neighbour,self.G.get_edge_data(neighbour,self.node)['weight'],1])
     
     def remove_connection(self,socket):
-        print("Removed a connection!")
         # Removes a connection on the graph found through the associated port.
         for node in list(self.G.neighbors(self.node) ):
             initial_port = 6000
@@ -146,7 +147,6 @@ class NodeObj:
             # Calculate what port the node is running on.
             if (ord(node)-ord(inital_node)+initial_port) == socket.getpeername()[1]:
                 self.G.remove_node(node)
-                print("Added elimination to queue")
                 self.sending_queue.append([node,1])
         
         self.client_sockets.remove(socket)
@@ -177,10 +177,12 @@ class NodeObj:
             print("One of the selected nodes doesn't exist.")
             return
         
+        # Update config file. 
         if ((node1,node2) in self.G.edges() or (node2,node1) in self.G.edges()):
             self.G[node1][node2]['weight'] = weight
+            self.reroute_flag = True
         else:
             print(f"Connection does not exist to update: {node1} {node2}")
 
 
-        self.sending_queue.append([node1,node2,weight])
+        self.sending_queue.append([node1,node2,weight,1])
