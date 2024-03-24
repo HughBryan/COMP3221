@@ -40,7 +40,7 @@ def command_line_interface(node_obj):
 
 # Rerouter. 
 def rerouter(node_obj):
-    inital_sleep = 0
+    inital_sleep = 60
     time.sleep(inital_sleep)
     default_timeout = 10
     while True:
