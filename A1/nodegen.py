@@ -173,7 +173,6 @@ if __name__ == "__main__":
     assign_weights(graph)
     export_graph_as_config(graph)
 
-    
     display_graph(graph)    
     save_graph_png(graph)
     routing_table(graph,'A')

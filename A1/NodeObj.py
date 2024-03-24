@@ -5,6 +5,7 @@ import json
 class NodeObj:
 
     def __init__(self,node,server_port, config):
+        self.config = config
         self.node = node
         self.host = "127.0.0.1"	
         self.server_port = server_port
@@ -15,7 +16,8 @@ class NodeObj:
         self.server_sockets = []
         self.client_sockets = []
         self.offline_client_sockets = []
-
+        self.original_topology = [node]
+        self.matching_ports = {}
         
 
         G = nx.Graph()
@@ -27,6 +29,7 @@ class NodeObj:
                     line = file.readline().strip().split()
                     G.add_node(line[0],port = int(line[2]))
                     G.add_edge(node,line[0],weight =round(float(line[1]),1))
+                    self.original_topology.append(line[0])
 
         except:
             raise Exception("Invalid config file")
@@ -37,15 +40,22 @@ class NodeObj:
         self.G = G
 
         # List that will function as a queue of updated weights that will be sent via packets. 
-        self.sending_queue = [[node,neighbour,G.get_edge_data(node,neighbour)['weight']] for neighbour in list(G.neighbors(node))]
+        self.sending_queue = [[node,neighbour,G.get_edge_data(node,neighbour)['weight'],1] for neighbour in list(G.neighbors(node))]
 
-
+    # Encode the code to send.
     def encode_queue(self,queue) -> str:        
 
         if not queue:
             return str([]).encode("utf-8")
         return str(queue).encode("utf-8")
 
+
+    # Encoded topology will by default not propogate through the network.
+    def send_topology_to_neighbours(self):
+        topology = []
+        for edge in self.G.edges():
+            topology.append([edge[0],edge[1],self.G.get_edge_data(edge[0],edge[1])['weight'],0])
+        return self.sending_queue.extend(topology)
 
 
     def decode_topology(self,message) -> str:
@@ -55,6 +65,8 @@ class NodeObj:
 
         try:
             message = message.replace("'",'"')
+            # Incase subsequent messages are sent.  
+            message = message.replace("][",',')
             packets_received = json.loads(message)
         except Exception as e:
             print(f"Error using json loading {message} {e}")
@@ -62,60 +74,80 @@ class NodeObj:
         
         
         for edge in packets_received:
-
-
+            pass_on = False
             # If we recieve a packet with only a single node, it means its marked for being down. 
-            if len(edge) == 1:
+            if len(edge) == 2:
                 # If the graph has the node and is not the node marked for removal; remove it. 
                 if self.G.has_node(edge[0]) and self.node != edge[0]:
                     self.G.remove_node(edge[0])
-                    pass_on_packets.append(edge)
                     self.reroute_flag = True
-                
+
+                    # if pass on packet is True
+                    if bool(edge[1]) == True:
+                        pass_on_packets.append(edge)
+
             else:
+    
+                print(edge)
 
                 edge_weight  = round(float(edge[2]),1)
-                if (edge[0],edge[1]) in self.G.edges() or (edge[0],edge[1]) in self.G.edges():
+                # If the edge already exists and we need to update weight.
+                if ((edge[0],edge[1]) in self.G.edges() or (edge[0],edge[1]) in self.G.edges()):
                     if self.G[edge[0]][edge[1]]["weight"] != edge_weight:
                         self.G[edge[0]][edge[1]]["weight"] = edge_weight
-                        # Add flag for rerouting.
-                        pass_on_packets.append(edge)
                         self.reroute_flag = True
+                        
+                        if bool(edge[3]) == True:
+                            pass_on_packets.append(edge)     
+                        
+                # Edge doesn't exist and we need to add it. 
                 else:
-        
+                    # readd connection if node becomes back online.
+                    if edge[0] in self.original_topology and edge[1] in self.original_topology and not self.G.has_edge(edge[0],edge[1]):
+                        for socket in self.offline_client_sockets:
+                            if edge[0] in self.matching_ports and self.matching_ports[edge[0]] == socket:
+                                self.add_connection(socket)
+                            if edge[1] in self.matching_ports and self.matching_ports[edge[1]] == socket:
+                                self.add_connection(socket)
+
+
+
                     self.G.add_edge(edge[0],edge[1])
                     self.G[edge[0]][edge[1]]["weight"] = edge_weight
-                    # Add flag for rerouting.
                     self.reroute_flag = True
-                    pass_on_packets.append(edge)
+                    
+                    if bool(edge[3]) == True:
+                        pass_on_packets.append(edge)     
 
-            self.sending_queue.extend(pass_on_packets)
+            
+
+        self.sending_queue.extend(pass_on_packets)
 
         return packets_received
 
 
-# NOT YET TESTED OR FULLY IMPLEMENTED.
     def disable_node(self):
         self.node_online = False
         self.reroute_flag = False
         
     def enable_node(self):
         self.node_online = True
-        # Empty buffer to ensure that future messages are read in their entirety. 
-        for sock in self.server_sockets:
-            while sock.recv(3000):
-                pass
+        
+        # Add nodes ready for sending. 
+        for neighbour in self.G.neighbors(self.node):
+            self.sending_queue.append([self.node,neighbour,self.G.get_edge_data(neighbour,self.node)['weight'],1])
     
     def remove_connection(self,socket):
-
+        print("Removed a connection!")
         # Removes a connection on the graph found through the associated port.
         for node in list(self.G.neighbors(self.node) ):
-            print(self.G.nodes()[node]['port'])
-
-            if self.G.nodes()[node]['port'] == socket.getpeername()[1]:
+            initial_port = 6000
+            inital_node = 'A'
+            # Calculate what port the node is running on.
+            if (ord(node)-ord(inital_node)+initial_port) == socket.getpeername()[1]:
                 self.G.remove_node(node)
                 print("Added elimination to queue")
-                self.sending_queue.append([node])
+                self.sending_queue.append([node,1])
         
         self.client_sockets.remove(socket)
         self.offline_client_sockets.append(socket)
@@ -126,6 +158,7 @@ class NodeObj:
         try:
             self.client_sockets.append(socket)
             self.offline_client_sockets.remove(socket)
+            self.send_topology_to_neighbours()
         except Exception as e:
             print(f"Error reconnecting with socket: {e}")
         

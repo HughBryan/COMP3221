@@ -18,19 +18,20 @@ def command_line_interface(node_obj,t1,t2,t3):
                 node_obj.disable_node()
 
 
-            if user_in.upper() == "UP":
+            elif user_in.upper() == "UP":
                 node_obj.enable_node()
 
-            if user_in.upper().startswith("CHANGE"):
+            elif user_in.upper().startswith("CHANGE"):
                 try:
                     node_obj.update_connection(user_in)
                 except: print("Invalid input. I.e., CHANGE A B 24")
+            
+            else:
+                print("Invalid command.")
 
         except KeyboardInterrupt:
             print("Interrupted by user. Shuttdowning down threads.")
-            t1.set()
-            t2.set()
-            t3.set()
+
             for socket in node_obj.server_sockets:
                 socket.close()
             for socket in node_obj.client_sockets:
@@ -62,29 +63,25 @@ def create_server_and_listen(node_obj):
 
     sockets = node_obj.server_sockets
 
-    print("Server hosted on port {}".format(host_port))
 
     # Connect to all clients that are trying to connect. Number of connections expected is the number of neighbours.
     try:
         while len(sockets) != expected_connections:
-            print("Waiting for client")
             conn, addr = s.accept()
             sockets.append(conn)
-            print(f"Server connected to: {s.getsockname()[1]}",)
 
     except KeyboardInterrupt:
         print("Stopped by Ctrl+C")
     
     # Listen to messages forever. 
     while True:
-        # Select returns ready sockets that have informaiton in them.
+        # Select returns ready sockets that have information in them.
         if node_obj.server_sockets and node_obj.node_online:
             ready_socks,_,_ = select.select(node_obj.server_sockets, [], []) 
-        
-            for sock in ready_socks:
-                    if sock in node_obj.offline_client_sockets:
-                        node_obj.add_connection(sock)
 
+
+            for sock in ready_socks:
+                    # check if it is an offline node. If it is, we turn it online. 
                     data = sock.recv(4096) 
                     if not data:
                         sock.close()
@@ -102,6 +99,8 @@ def create_server_and_listen(node_obj):
 
 # Establish connections with neighbours. 
 def establish_connections(node_obj):
+    default_timeout = 3
+    inital_port = 6000
 
     host = node_obj.host
 
@@ -112,7 +111,9 @@ def establish_connections(node_obj):
             try:
                 s = socket.socket(socket.AF_INET,socket.SOCK_STREAM,)
                 s.connect((host,port))
+                print("sock name: ",s.getsockname(), "peer name: ", s.getpeername())
                 node_obj.client_sockets.append(s)
+                node_obj.matching_ports[chr(port-inital_port+ord('A'))] = s
                 connected = True
                 print(f"Client connected to {port}")
 
@@ -137,6 +138,7 @@ def establish_connections(node_obj):
                     ready_sock,_,_ = select.select([sock], [], [],timeout) 
                     if not ready_sock:
                         node_obj.remove_connection(sock)
+                        print(f"REMOVED SOCK: peer {sock.getpeername()[1]} name {sock.getsockname()[1]}")
                     else:
                         message = sock.recv(4096).decode("utf8")
                         if message == "Recieved":
@@ -145,7 +147,9 @@ def establish_connections(node_obj):
                             print(f"Unknown message recieved: {message}")
                 except ConnectionResetError:
                     pass
-            time.sleep(10)
+            
+            
+            time.sleep(default_timeout)
 
 
 
