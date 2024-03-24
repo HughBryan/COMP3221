@@ -77,7 +77,7 @@ def create_server_and_listen(node_obj):
     except KeyboardInterrupt:
         print("Stopped by Ctrl+C")
     
-
+    # We are now ready to send data packets. 
     node_obj.ready_to_send = True
     # Listen to messages forever. 
     while True:
@@ -104,7 +104,7 @@ def create_server_and_listen(node_obj):
 
 # Establish connections with neighbours. 
 def establish_connections(node_obj):
-    default_timeout = 3
+    default_timeout = 60
     inital_port = 6000
     buffer = 4096
     host = node_obj.host
@@ -117,6 +117,7 @@ def establish_connections(node_obj):
                 s = socket.socket(socket.AF_INET,socket.SOCK_STREAM,)
                 s.connect((host,port))
                 node_obj.client_sockets.append(s)
+                # The target port will correspond with the socket that attaches to it. 
                 node_obj.matching_ports[chr(port-inital_port+ord('A'))] = s
                 connected = True
 
@@ -136,9 +137,11 @@ def establish_connections(node_obj):
                     sock.send(node_obj.encode_queue(queue))
 
 
-                    # Wait 3 seconds for return. If it does not return, we can assume that node is down. 
-                    timeout = 3
+                    # Wait 2 seconds for return. If it does not return, we can assume that node is down. 
+                    timeout = 2
                     ready_sock,_,_ = select.select([sock], [], [],timeout) 
+                    
+                    # If we didn't receieve a response, we can only assume that the node is offline. 
                     if not ready_sock:
                         node_obj.remove_connection(sock)
                     else:
